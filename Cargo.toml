@@ -4,3 +4,5 @@ version = "0.1.0"
 authors = ["gregjm@umich.edu"]
 
 [dependencies]
+serde = "^1.0.69"
+serde_json = "^1.0.22"
