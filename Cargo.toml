@@ -5,4 +5,5 @@ authors = ["gregjm@umich.edu"]
 
 [dependencies]
 serde = "^1.0.69"
+serde_derive = "^1.0.69"
 serde_json = "^1.0.22"
