@@ -1,0 +1,6 @@
+[package]
+name = "update-alternatives"
+version = "0.1.0"
+authors = ["gregjm@umich.edu"]
+
+[dependencies]
