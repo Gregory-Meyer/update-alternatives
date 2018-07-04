@@ -30,8 +30,7 @@ extern crate serde_json;
 
 use super::alternative::Alternative;
 use super::alternative_list::AlternativeList;
-
-use std::io::{Read, Write};
+use super::filesystem;
 
 type AlternativeTable = std::collections::HashMap<String, AlternativeList>;
 
@@ -80,27 +79,14 @@ impl AlternativeDb {
                 },
             });
 
-            let mut file = match std::fs::File::open(&path) {
-                Ok(f) => f,
+            let contents = match filesystem::read(&path) {
+                Ok(c) => c,
                 Err(e) => {
-                    eprintln!("update-alternatives: could not open file {}: {}",
-                              path.display(), e);
-
-                    continue;
-                },
-            };
-
-            let contents = {
-                let mut buffer = String::new();
-
-                if let Err(e) = file.read_to_string(&mut buffer) {
-                    eprintln!("update-alternatives: unable to read file {}: {}",
+                    eprintln!("update-alternatives: could not read file {}: {}",
                               path.display(), e);
 
                     continue;
                 }
-
-                buffer
             };
 
             let list: AlternativeList = match serde_json::from_str(&contents) {
@@ -167,7 +153,7 @@ impl AlternativeDb {
         let folder_path = folder.as_ref();
 
         if !folder_path.exists() {
-            if let Err(e) = std::fs::create_dir_all(folder_path) {
+            if let Err(e) = filesystem::create_dir(folder_path) {
                 return Err(e);
             }
         } else if !folder_path.is_dir() {
@@ -228,21 +214,12 @@ impl AlternativeDb {
 
     fn write_list(list: &AlternativeList,
                   path: &std::path::Path) -> std::io::Result<usize> {
-        let mut file = match std::fs::File::create(path) {
-            Ok(f) => f,
-            Err(e) => return Err(e),
-        };
-
         let to_write = match serde_json::to_string(list) {
             Ok(s) => s,
             Err(e) => return Err(std::io::Error::from(e)),
         };
 
-        if let Err(e) = file.write_all(to_write.as_bytes()) {
-            Err(e)
-        } else {
-            Ok(to_write.len())
-        }
+        filesystem::write(to_write, path)
     }
 
     fn cleanup(link: &std::path::Path) {

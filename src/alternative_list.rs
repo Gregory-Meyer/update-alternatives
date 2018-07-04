@@ -29,6 +29,7 @@ extern crate std;
 extern crate serde_json;
 
 use super::alternative::Alternative;
+use super::filesystem;
 
 #[derive(Serialize, Deserialize)]
 pub struct AlternativeList {
@@ -62,22 +63,14 @@ impl AlternativeList {
                         return Ok(false);
                     }
                 }
+            }
 
-                if let Err(e) = std::fs::remove_file(&self.path) {
-                    return Err(e);
-                }
-            } else if self.path.is_dir() {
-                if let Err(e) = std::fs::remove_dir(&self.path) {
-                    return Err(e);
-                }
-            } else {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::AlreadyExists, "path already exists"
-                ));
+            if let Err(e) = filesystem::remove(&self.path) {
+                return Err(e);
             }
         }
 
-        if let Err(e) = std::os::unix::fs::symlink(target, &self.path) {
+        if let Err(e) = filesystem::symlink(target, &self.path) {
             return Err(e);
         }
 
