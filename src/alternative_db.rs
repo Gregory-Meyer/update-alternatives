@@ -153,7 +153,7 @@ impl AlternativeDb {
         let folder_path = folder.as_ref();
 
         if !folder_path.exists() {
-            if let Err(e) = std::fs::create_dir_all(folder_path) {
+            if let Err(e) = filesystem::create_dir(folder_path) {
                 return Err(e);
             }
         } else if !folder_path.is_dir() {

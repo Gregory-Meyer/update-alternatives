@@ -76,3 +76,8 @@ pub fn read_file<P: std::convert::AsRef<std::path::Path>>(path: P)
         Err(e) => Err(e),
     }
 }
+
+pub fn create_dir<P: std::convert::AsRef<std::path::Path>>(path: P)
+-> std::io::Result<()> {
+    std::fs::create_dir_all(path)
+}
