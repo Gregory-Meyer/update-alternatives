@@ -24,8 +24,8 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#[macro_use]
 extern crate clap;
-
 #[macro_use]
 extern crate serde_derive;
 
@@ -39,41 +39,60 @@ use alternative_db::AlternativeDb;
 
 fn main() {
     let matches = clap::App::new("update-alternatives")
-        .version("0.3.1")
+        .version(crate_version!())
         .author("Gregory Meyer <gregjm@umich.edu>")
-        .about("handles symlinking for multiple files")
-        .long_about("places symlinks it creates in /usr/local/bin/$NAME, where \
-                    NAME is the specified name of the link")
+        .about(ABOUT)
         .subcommand(clap::SubCommand::with_name("list")
-                        .about("list alternatives for a given name")
+                        .about(LIST_ABOUT)
                         .arg(clap::Arg::with_name("NAME")
-                                 .help("the name to query")
+                                 .help("The name of the alternatives to query")
+                                 .value_name("NAME")
+                                 .short("n")
+                                 .long("name")
                                  .required(true)
-                                 .index(1)))
+                                 .takes_value(true)))
         .subcommand(clap::SubCommand::with_name("add")
-                        .about("add a link")
+                        .about(ADD_ABOUT)
                         .arg(clap::Arg::with_name("TARGET")
-                                 .help("the target of the link to add")
+                                 .help("The target of the alternative to add")
+                                 .value_name("TARGET")
+                                 .short("t")
+                                 .long("target")
                                  .required(true)
-                                 .index(1))
+                                 .takes_value(true))
                         .arg(clap::Arg::with_name("NAME")
-                                 .help("the name of the link to add")
+                                 .help("The name of the alternative to add")
+                                 .value_name("NAME")
+                                 .short("n")
+                                 .long("name")
                                  .required(true)
-                                 .index(2))
+                                 .takes_value(true))
                         .arg(clap::Arg::with_name("WEIGHT")
-                                 .help("the weight of the link to add")
+                                 .help("The priority of the alternative to add")
+                                 .value_name("WEIGHT")
+                                 .short("w")
+                                 .long("weight")
                                  .required(true)
-                                 .index(3)))
+                                 .takes_value(true)))
         .subcommand(clap::SubCommand::with_name("remove")
-                        .about("remove a link")
+                        .about(REMOVE_ABOUT)
                         .arg(clap::Arg::with_name("TARGET")
-                                 .help("the target of the link to remove")
+                                 .help("The target of the \
+                                       alternative to remove")
+                                 .value_name("TARGET")
+                                 .short("t")
+                                 .long("target")
                                  .required(true)
-                                 .index(1))
+                                 .takes_value(true))
                         .arg(clap::Arg::with_name("NAME")
-                                 .help("the name of the link to remove")
+                                 .help("The name of the alternative to remove")
+                                 .value_name("NAME")
+                                 .short("n")
+                                 .long("name")
                                  .required(true)
-                                 .index(2)))
+                                 .takes_value(true)))
+        .setting(clap::AppSettings::SubcommandRequiredElseHelp)
+        .setting(clap::AppSettings::GlobalVersion)
         .get_matches();
 
     let mut db = match AlternativeDb::from_folder("/etc/alternatives") {
@@ -154,3 +173,23 @@ fn main() {
         }
     }
 }
+
+static ABOUT: &'static str =
+    "Manages symlinks to be placed in /usr/local/bin. Data is stored in \
+    /etc/alternatives for persistence between invocations. Provides similar \
+    functionality to Debian's update-alternatives, but with a slightly \
+    different interface. Alternatives are selected by comparing their assigned \
+    priority values, with the highest priority being linked to.";
+
+static LIST_ABOUT: &'static str =
+    "Lists all alternatives for <NAME> and their assigned priority.";
+
+static ADD_ABOUT: &'static str =
+    "Adds or modifies an alternative for <NAME> that points to <TARGET> with \
+    priority <WEIGHT>. If the database is modified, requires read/write access \
+    to /etc/alternatives and /usr/local/bin.";
+
+static REMOVE_ABOUT: &'static str =
+    "If one exists, removes the alternative for <NAME> that points to \
+    <TARGET>. If the database is modified, requires read/write access to \
+    /etc/alternatives and /usr/local/bin.";
