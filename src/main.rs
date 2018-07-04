@@ -45,8 +45,11 @@ fn main() {
         let link = list_matches.value_of("LINK").unwrap();
 
         if alternatives.contains_key(link) {
-            println!("update-alternatives: listing alternatives for {}...",
-                     link);
+            println!("alternatives for {}:", link);
+
+            for alternative in alternatives[link].alternatives.iter() {
+                println!("    {}", alternative);
+            }
         } else {
             panic!("update-alternatives: link {} does not exist", link);
         }
@@ -62,6 +65,9 @@ fn main() {
         };
 
         add_alternative(&mut alternatives, target, name, weight);
+        mutated = true;
+    } else {
+        println!("{}", matches.usage());
     }
 
     if mutated {
@@ -114,13 +120,13 @@ fn load_alternatives() -> AlternativeMap {
             None => continue,
         }
 
-        let name = path.file_name().unwrap(); // should have a name
+        let name = path.file_stem().unwrap(); // should have a name
         let key = String::from(name.to_string_lossy());
 
         let parsed = parse_alternatives_file(&path);
 
         println!("found link {} with {} alternatives",
-                 parsed.name, parsed.alternatives.len());
+                 name.to_string_lossy(), parsed.alternatives.len());
 
         alternatives.insert(key, parsed);
     }
@@ -130,7 +136,7 @@ fn load_alternatives() -> AlternativeMap {
 
 // path must be a normal file
 fn parse_alternatives_file(path: &std::path::Path) -> Alternatives {
-    let name = String::from(path.file_name().unwrap().to_string_lossy());
+    let name = String::from(path.file_stem().unwrap().to_string_lossy());
 
     let mut file = match std::fs::File::open(path) {
         Ok(f) => f,
@@ -146,16 +152,7 @@ fn parse_alternatives_file(path: &std::path::Path) -> Alternatives {
     }
 
     match serde_json::from_str(&contents) {
-        Ok(a) => {
-            let alternatives: Alternatives = a;
-
-            if alternatives.name != name {
-                panic!("update-alternatives: error parsing file {}: filename \
-                       does not match name", path.to_string_lossy());
-            }
-
-            alternatives
-        },
+        Ok(a) => a,
         Err(e) => panic!("update-alternatives: unable to parse file {}: {}",
                          path.to_string_lossy(), e.description()),
     }
@@ -164,35 +161,58 @@ fn parse_alternatives_file(path: &std::path::Path) -> Alternatives {
 fn add_alternative(alternatives: &mut AlternativeMap, target: &str,
                    name: &str, weight: i32) {
     let target_path = std::path::PathBuf::from(target);
-    let location = std::path::PathBuf::from(format!("/usr/local/bin/{}", name));
+    let location = format!("/usr/local/bin/{}", name);
+    let location_path = std::path::PathBuf::from(&location);
 
     if alternatives.contains_key(name) {
         let ref mut alts = alternatives.get_mut(name).unwrap();
+
+        if alts.location != location_path {
+            println!("updated location from {} to {}",
+                     alts.location.to_string_lossy(), location);
+
+            alts.location = location_path;
+        }
+
         let ref mut links = alts.alternatives;
 
-        let position = match links.iter()
-                                  .map(|e| &e.target)
-                                  .position(|t| t == &target_path) {
-            Some(i) => i,
+        match links.iter().map(|e| &e.target).position(|t| t == &target_path) {
+            Some(i) => {
+                let link = &mut links[i];
+                link.priority = weight;
+
+                println!("updated priority of {} to {}", target, weight);
+            },
             None => {
                 links.push(Alternative{
-                    name: String::from(name),
                     target: target_path,
-                    location,
                     priority: weight
                 });
 
-                links.len() - 1
+                println!("added alternative {} with priority {}",
+                         target, weight);
             },
-        };
+        }
+    } else {
+        alternatives.insert(
+            String::from(name),
+            Alternatives{
+                location: location_path,
+                alternatives: vec![Alternative{
+                    target: target_path,
+                    priority: weight
+                }]
+            }
+        );
     }
 }
 
 fn commit_alternatives(alternatives: &AlternativeMap) {
     for (name, links) in alternatives.iter() {
-        write_links(name, &links);
-        remove_old_links(name);
-        rename_new_links(name);
+        write_links(&name, &links);
+        remove_old_links(&name);
+        rename_new_links(&name);
+        set_symlink(&links);
     }
 }
 
@@ -210,7 +230,7 @@ fn write_links(name: &str, links: &Alternatives) {
                          alternatives for {}: {}", name, e.description()),
     };
 
-    match write!(temp, "{}", serialized) {
+    match writeln!(temp, "{}", serialized) {
         Err(e) => panic!("update-alternatives: error while writing to file \
                          {}: {}", filename, e.description()),
         _ => (),
@@ -219,6 +239,12 @@ fn write_links(name: &str, links: &Alternatives) {
 
 fn remove_old_links(name: &str) {
     let filename = format!("/etc/alternatives/{}.json", name);
+    let path = std::path::Path::new(&filename);
+
+    if !path.exists() {
+        return;
+    }
+
     match std::fs::remove_file(&filename) {
         Err(e) => panic!("update-alternatives: error removing file {}: {}",
                          filename, e.description()),
@@ -233,18 +259,54 @@ fn rename_new_links(name: &str) {
     std::fs::rename(temp_filename, new_filename).unwrap();
 }
 
+fn set_symlink(alternatives: &Alternatives) {
+    if alternatives.alternatives.len() == 0 {
+        return;
+    }
+
+    let location = &alternatives.location;
+    let max = alternatives.alternatives
+                          .iter()
+                          .max_by_key(|l| l.priority)
+                          .unwrap();
+    let target = &max.target;
+
+    if location.exists() {
+        match std::fs::remove_file(&location) {
+            Err(e) => panic!("update-alternatives: error removing file {}: {}",
+                             location.to_string_lossy(), e.description()),
+            _ => (),
+        }
+    }
+
+    match std::os::unix::fs::symlink(target, location) {
+        Err(e) => panic!("update-alternatives: could not create symlink from \
+                         {} to {}: {}", location.to_string_lossy(),
+                         target.to_string_lossy(), e.description()),
+        _ => (),
+    }
+
+    println!("using {} with priority {}", target.to_string_lossy(),
+             max.priority);
+}
+
 type AlternativeMap = std::collections::HashMap<String, Alternatives>;
 
 #[derive(Serialize, Deserialize)]
 struct Alternative {
-    name: String,
     target: std::path::PathBuf,
-    location: std::path::PathBuf,
     priority: i32,
+}
+
+impl std::fmt::Display for Alternative {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(formatter, "{}: {}", self.target.to_string_lossy(),
+               self.priority)
+    }
 }
 
 #[derive(Serialize, Deserialize)]
 struct Alternatives {
-    name: String,
+    location: std::path::PathBuf,
     alternatives: Vec<Alternative>,
 }
