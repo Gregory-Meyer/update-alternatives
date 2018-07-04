@@ -2,7 +2,7 @@
 
 ![Travis build status][travis]
 
-[travis]: https://travis-ci.org/Gregory-Meyer/update-alternatives.svg?branch=named-args
+[travis]: https://travis-ci.org/Gregory-Meyer/update-alternatives.svg?branch=master
 
 ## Synopsis
 
