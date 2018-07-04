@@ -11,7 +11,7 @@ use std::error::Error;
 
 fn main() {
     let matches = clap::App::new("update-alternatives")
-        .version("0.2.0")
+        .version("0.2.1")
         .author("Gregory Meyer <gregjm@umich.edu>")
         .about("handles symlinking for multiple files")
         .long_about("places symlinks it creates in /usr/local/bin/$NAME, where \
@@ -252,7 +252,7 @@ fn commit_alternatives(alternatives: &AlternativeMap) {
         write_links(&name, &links);
         remove_old_links(&name);
         rename_new_links(&name);
-        set_symlink(&links);
+        set_symlink(&name, &links);
     }
 }
 
@@ -299,7 +299,7 @@ fn rename_new_links(name: &str) {
     std::fs::rename(temp_filename, new_filename).unwrap();
 }
 
-fn set_symlink(alternatives: &Alternatives) {
+fn set_symlink(name: &str, alternatives: &Alternatives) {
     if alternatives.alternatives.len() == 0 {
         return;
     }
@@ -326,7 +326,7 @@ fn set_symlink(alternatives: &Alternatives) {
         _ => (),
     }
 
-    println!("using {} with priority {}", target.to_string_lossy(),
+    println!("using {} for {} with priority {}", target.to_string_lossy(), name,
              max.priority);
 }
 
