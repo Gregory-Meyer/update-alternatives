@@ -54,6 +54,11 @@ Clone this repository, then run `cargo build --release` in the root of the
 repository. Copy the executable located in `target/release/update-alternatives`
 to your installation directory, such as `/usr/local/bin`.
 
+## Motivation
+
+Arch Linux (naturally) doesn't have `update-alternatives`, nor was I able to
+easily find one on AUR. This seemed fun and easy enough.
+
 ## Contributors
 
 `update-alternatives` is authored and maintained by Gregory Meyer, and is
