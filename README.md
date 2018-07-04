@@ -5,6 +5,30 @@
 of the same name. Information about alternatives is stored in
 `/etc/alternatives` for recovery between invocations of `update-alternatives`.
 
+## Example
+
+```sh
+$ sudo update-alternatives add $(which gcc) cc 10
+using /usr/bin/gcc for cc with priority 10
+$ sudo update-alternatives add $(which clang) cc 20
+found link cc with 1 alternatives
+added alternative /usr/bin/clang with priority 20
+using /usr/bin/clang for cc with priority 20
+$ update-alternatives list cc
+found link cc with 2 alternatives
+alternatives for cc:
+    /usr/bin/gcc: 10
+    /usr/bin/clang: 20
+$ update-alternatives remove $(which gcc) cc
+found link cc with 2 alternatives
+removed alternative /usr/bin/gcc
+using /usr/bin/clang for cc with priority 20
+$ update-alternatives list cc
+found link cc with 1 alternatives
+alternatives for cc:
+    /usr/bin/clang: 20
+```
+
 ## Usage
 
 The first invocation of `update-alternatives` will require read-write access to
