@@ -82,18 +82,17 @@ pub fn create_dir<P: std::convert::AsRef<std::path::Path>>(path: P)
     std::fs::create_dir_all(path)
 }
 
-pub fn write<S: std::convert::AsRef<str>,
-             P: std::convert::AsRef<std::path::Path>>(contents: S, path: P)
--> std::io::Result<usize> {
-    let into_str = contents.as_ref();
-    let len = into_str.len();
+pub fn write<S, P: std::convert::AsRef<std::path::Path>>(contents: S, path: P)
+-> std::io::Result<usize> where String: std::convert::From<S> {
+    let to_write = String::from(contents);
+    let len = to_write.len();
 
     let mut file = match std::fs::File::create(path) {
         Ok(f) => f,
         Err(e) => return Err(e),
     };
 
-    match file.write_all(into_str.as_bytes()) {
+    match file.write_all(to_write.as_bytes()) {
         Ok(_) => Ok(len),
         Err(e) => Err(e),
     }
