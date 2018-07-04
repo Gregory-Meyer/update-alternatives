@@ -79,7 +79,7 @@ impl AlternativeDb {
                 },
             });
 
-            let contents = match filesystem::read_file(&path) {
+            let contents = match filesystem::read(&path) {
                 Ok(c) => c,
                 Err(e) => {
                     eprintln!("update-alternatives: could not read file {}: {}",
@@ -214,21 +214,12 @@ impl AlternativeDb {
 
     fn write_list(list: &AlternativeList,
                   path: &std::path::Path) -> std::io::Result<usize> {
-        let mut file = match std::fs::File::create(path) {
-            Ok(f) => f,
-            Err(e) => return Err(e),
-        };
-
         let to_write = match serde_json::to_string(list) {
             Ok(s) => s,
             Err(e) => return Err(std::io::Error::from(e)),
         };
 
-        if let Err(e) = file.write_all(to_write.as_bytes()) {
-            Err(e)
-        } else {
-            Ok(to_write.len())
-        }
+        filesystem::write(to_write, path)
     }
 
     fn cleanup(link: &std::path::Path) {

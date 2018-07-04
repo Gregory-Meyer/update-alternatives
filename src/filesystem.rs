@@ -26,7 +26,7 @@
 
 extern crate std;
 
-use std::io::Read;
+use std::io::{Read, Write};
 
 pub fn remove<P: std::convert::AsRef<std::path::Path>>(path: P)
 -> std::io::Result<()> {
@@ -62,7 +62,7 @@ pub fn symlink<P: std::convert::AsRef<std::path::Path>,
     std::os::windows::fs::symlink_file(source, destination)
 }
 
-pub fn read_file<P: std::convert::AsRef<std::path::Path>>(path: P)
+pub fn read<P: std::convert::AsRef<std::path::Path>>(path: P)
 -> std::io::Result<String> {
     let mut file = match std::fs::File::open(path) {
         Ok(f) => f,
@@ -80,4 +80,21 @@ pub fn read_file<P: std::convert::AsRef<std::path::Path>>(path: P)
 pub fn create_dir<P: std::convert::AsRef<std::path::Path>>(path: P)
 -> std::io::Result<()> {
     std::fs::create_dir_all(path)
+}
+
+pub fn write<S: std::convert::AsRef<str>,
+             P: std::convert::AsRef<std::path::Path>>(contents: S, path: P)
+-> std::io::Result<usize> {
+    let into_str = contents.as_ref();
+    let len = into_str.len();
+
+    let mut file = match std::fs::File::create(path) {
+        Ok(f) => f,
+        Err(e) => return Err(e),
+    };
+
+    match file.write_all(into_str.as_bytes()) {
+        Ok(_) => Ok(len),
+        Err(e) => Err(e),
+    }
 }
