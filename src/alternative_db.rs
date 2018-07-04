@@ -30,8 +30,7 @@ extern crate serde_json;
 
 use super::alternative::Alternative;
 use super::alternative_list::AlternativeList;
-
-use std::io::{Read, Write};
+use super::filesystem;
 
 type AlternativeTable = std::collections::HashMap<String, AlternativeList>;
 
@@ -80,27 +79,14 @@ impl AlternativeDb {
                 },
             });
 
-            let mut file = match std::fs::File::open(&path) {
-                Ok(f) => f,
+            let contents = match filesystem::read_file(&path) {
+                Ok(c) => c,
                 Err(e) => {
-                    eprintln!("update-alternatives: could not open file {}: {}",
-                              path.display(), e);
-
-                    continue;
-                },
-            };
-
-            let contents = {
-                let mut buffer = String::new();
-
-                if let Err(e) = file.read_to_string(&mut buffer) {
-                    eprintln!("update-alternatives: unable to read file {}: {}",
+                    eprintln!("update-alternatives: could not read file {}: {}",
                               path.display(), e);
 
                     continue;
                 }
-
-                buffer
             };
 
             let list: AlternativeList = match serde_json::from_str(&contents) {

@@ -32,6 +32,7 @@ extern crate serde_derive;
 mod alternative;
 mod alternative_db;
 mod alternative_list;
+mod filesystem;
 
 use alternative::Alternative;
 use alternative_db::AlternativeDb;
