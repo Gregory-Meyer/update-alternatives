@@ -1,6 +1,6 @@
 ## Synopsis
 
-`update-alternatives` is a simple tool to manage executable symlinks in
+`update-alternatives` is a utility to manage executable symlinks in
 `/usr/local/bin`. It implements a subset of the functionality in Debian's tool
 of the same name. Information about alternatives is stored in
 `/etc/alternatives` for recovery between invocations of `update-alternatives`.
