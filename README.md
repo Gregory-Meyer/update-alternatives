@@ -1,3 +1,9 @@
+## Status
+
+![Travis build status][travis]
+
+[travis]: https://travis-ci.org/Gregory-Meyer/update-alternatives.svg?branch=travis
+
 ## Synopsis
 
 `update-alternatives` is a utility to manage executable symlinks in
