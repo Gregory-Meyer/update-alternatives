@@ -14,6 +14,8 @@ fn main() {
         .version("0.1.0")
         .author("Gregory Meyer <gregjm@umich.edu>")
         .about("handles symlinking for multiple files")
+        .long_about("places symlinks it creates in /usr/local/bin/$NAME, where \
+                    NAME is the specified name of the link")
         .subcommand(clap::SubCommand::with_name("list")
                         .about("list alternatives for a given link")
                         .arg(clap::Arg::with_name("LINK")
@@ -34,12 +36,22 @@ fn main() {
                                  .help("the weight of the link to add")
                                  .required(true)
                                  .index(3)))
+        .subcommand(clap::SubCommand::with_name("remove")
+                        .about("remove a link")
+                        .arg(clap::Arg::with_name("TARGET")
+                                 .help("the target of the link to remove")
+                                 .required(true)
+                                 .index(1))
+                        .arg(clap::Arg::with_name("NAME")
+                                 .help("the name of the link to remove")
+                                 .required(true)
+                                 .index(2)))
         .get_matches();
 
     initialize_files();
 
     let mut alternatives = load_alternatives();
-    let mut mutated = false;
+    let mutated;
 
     if let Some(list_matches) = matches.subcommand_matches("list") {
         let link = list_matches.value_of("LINK").unwrap();
@@ -53,6 +65,8 @@ fn main() {
         } else {
             panic!("update-alternatives: link {} does not exist", link);
         }
+
+        mutated = false;
     } else if let Some(add_matches) = matches.subcommand_matches("add") {
         let target = add_matches.value_of("TARGET").unwrap();
         let name = add_matches.value_of("NAME").unwrap();
@@ -66,8 +80,15 @@ fn main() {
 
         add_alternative(&mut alternatives, target, name, weight);
         mutated = true;
+    } else if let Some(remove_matches) = matches.subcommand_matches("remove") {
+        let target = remove_matches.value_of("TARGET").unwrap();
+        let name = remove_matches.value_of("NAME").unwrap();
+
+        remove_alternative(&mut alternatives, target, name);
+        mutated = true;
     } else {
         println!("{}", matches.usage());
+        mutated = false;
     }
 
     if mutated {
@@ -136,8 +157,6 @@ fn load_alternatives() -> AlternativeMap {
 
 // path must be a normal file
 fn parse_alternatives_file(path: &std::path::Path) -> Alternatives {
-    let name = String::from(path.file_stem().unwrap().to_string_lossy());
-
     let mut file = match std::fs::File::open(path) {
         Ok(f) => f,
         Err(e) => panic!("update-alternatives: unable to open file {}: {}",
@@ -165,7 +184,7 @@ fn add_alternative(alternatives: &mut AlternativeMap, target: &str,
     let location_path = std::path::PathBuf::from(&location);
 
     if alternatives.contains_key(name) {
-        let ref mut alts = alternatives.get_mut(name).unwrap();
+        let alts = alternatives.get_mut(name).unwrap();
 
         if alts.location != location_path {
             println!("updated location from {} to {}",
@@ -205,6 +224,27 @@ fn add_alternative(alternatives: &mut AlternativeMap, target: &str,
             }
         );
     }
+}
+
+fn remove_alternative(alternatives: &mut AlternativeMap, target: &str,
+                      name: &str) {
+    let target_path = std::path::Path::new(target);
+
+    if !alternatives.contains_key(name) {
+        return;
+    }
+
+    let alts = alternatives.get_mut(name).unwrap();
+
+    let found_index = match alts.alternatives
+                                .iter()
+                                .position(|l| l.target == target_path) {
+        Some(i) => i,
+        None => return,
+    };
+
+    alts.alternatives.remove(found_index);
+    println!("removed alternative {}", target);
 }
 
 fn commit_alternatives(alternatives: &AlternativeMap) {
