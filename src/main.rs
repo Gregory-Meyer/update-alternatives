@@ -11,7 +11,7 @@ use std::error::Error;
 
 fn main() {
     let matches = clap::App::new("update-alternatives")
-        .version("0.1.0")
+        .version("0.2.0")
         .author("Gregory Meyer <gregjm@umich.edu>")
         .about("handles symlinking for multiple files")
         .long_about("places symlinks it creates in /usr/local/bin/$NAME, where \
