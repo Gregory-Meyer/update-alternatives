@@ -38,7 +38,119 @@ use alternative::Alternative;
 use alternative_db::AlternativeDb;
 
 fn main() {
-    let matches = clap::App::new("update-alternatives")
+    let matches = app().get_matches();
+
+    let mut db = match read_db("/etc/alternatives") {
+        Ok(d) => d,
+        Err(_) => std::process::exit(1),
+    };
+
+    let mutated;
+
+    if let Some(list_matches) = matches.subcommand_matches("list") {
+        mutated = list(&db, list_matches);
+    } else if let Some(add_matches) = matches.subcommand_matches("add") {
+        mutated = add(&mut db, add_matches);
+    } else if let Some(remove_matches) = matches.subcommand_matches("remove") {
+        mutated = remove(&mut db, remove_matches);
+    } else {
+        mutated = false;
+    }
+
+    if mutated && commit(&db).is_err() {
+        std::process::exit(1);
+    }
+}
+
+fn read_db<P: std::convert::AsRef<std::path::Path>>(path: P)
+-> std::io::Result<AlternativeDb> {
+    match AlternativeDb::from_folder(path) {
+        Ok(d) => {
+            println!("update-alternatives: parsed {} alternatives",
+                     d.num_alternatives());
+
+            Ok(d)
+        },
+        Err(e) => {
+            eprintln!("update-alternatives: could not read folder \
+                      /etc/alternatives: {}", e);
+
+            Err(e)
+        }
+    }
+}
+
+fn list(db: &AlternativeDb, matches: &clap::ArgMatches) -> bool {
+    let name = matches.value_of("NAME").unwrap();
+
+    match db.alternatives(name) {
+        Some(alternatives) => {
+            print!("update-alternatives: {}", alternatives);
+        },
+        None => {
+            eprintln!("update-alternatives: no alternatives found for {}", name);
+        }
+    }
+
+    false
+}
+
+fn add(db: &mut AlternativeDb, matches: &clap::ArgMatches) -> bool {
+    let target = matches.value_of("TARGET").unwrap();
+    let name = matches.value_of("NAME").unwrap();
+    let weight_str = matches.value_of("WEIGHT").unwrap();
+
+    let weight: i32 = match weight_str.parse() {
+        Ok(w) => w,
+        Err(e) => {
+            eprintln!("update-alternatives: could not parse {} as \
+                      weight: {}", weight_str, e);
+
+            std::process::exit(1);
+        },
+    };
+
+    if db.add_alternative(name, Alternative::from_parts(target, weight)) {
+        println!("update-alternatives: added alternative {} for {} with \
+                 priority {}", target, name, weight);
+
+        return true;
+    }
+
+    false
+}
+
+fn remove(db: &mut AlternativeDb, matches: &clap::ArgMatches) -> bool {
+    let target = matches.value_of("TARGET").unwrap();
+    let name = matches.value_of("NAME").unwrap();
+
+    if db.remove_alternative(name, target) {
+        println!("update-alternatives: removed alternative {} for {}",
+                 target, name);
+
+        return true;
+    }
+
+    false
+}
+
+fn commit(db: &AlternativeDb) -> std::io::Result<()> {
+    if let Err(e) = db.write_out("/etc/alternatives") {
+        eprintln!("update-alternatives: could not commit changes to \
+                  /etc/alternatives: {}", e);
+
+        Err(e)
+    } else if let Err(e) = db.write_links() {
+        eprintln!("update-alternatives: could not write symlinks: {}", e);
+
+        Err(e)
+    } else {
+        Ok(())
+    }
+}
+
+fn app<'a, 'b>() -> clap::App<'a, 'b> {
+    clap::App::new("update-alternatives")
         .version(crate_version!())
         .author("Gregory Meyer <gregjm@umich.edu>")
         .about(ABOUT)
@@ -93,85 +205,6 @@ fn main() {
                                  .takes_value(true)))
         .setting(clap::AppSettings::SubcommandRequiredElseHelp)
         .setting(clap::AppSettings::GlobalVersion)
-        .get_matches();
-
-    let mut db = match AlternativeDb::from_folder("/etc/alternatives") {
-        Ok(d) => d,
-        Err(e) => {
-            eprintln!("update-alternatives: could not read folder \
-                      /etc/alternatives: {}", e);
-
-            std::process::exit(1);
-        }
-    };
-
-    println!("update-alternatives: parsed {} alternatives",
-             db.num_alternatives());
-
-    let mutated;
-
-    if let Some(list_matches) = matches.subcommand_matches("list") {
-        let name = list_matches.value_of("NAME").unwrap();
-
-        match db.alternatives(name) {
-            Some(alternatives) => {
-                print!("update-alternatives: {}", alternatives);
-            },
-            None => {
-                eprintln!("update-alternatives: no alternatives found for {}",
-                          name);
-            }
-        }
-
-        mutated = false;
-    } else if let Some(add_matches) = matches.subcommand_matches("add") {
-        let target = add_matches.value_of("TARGET").unwrap();
-        let name = add_matches.value_of("NAME").unwrap();
-        let weight_str = add_matches.value_of("WEIGHT").unwrap();
-
-        let weight: i32 = match weight_str.parse() {
-            Ok(w) => w,
-            Err(e) => {
-                eprintln!("update-alternatives: could not parse {} as \
-                          weight: {}", weight_str, e);
-
-                std::process::exit(1);
-            },
-        };
-
-        mutated = db.add_alternative(name, Alternative::from_parts(target,
-                                                                   weight));
-
-        if mutated {
-            println!("update-alternatives: added alternative {} for {} with \
-                     priority {}", target, name, weight);
-        }
-    } else if let Some(remove_matches) = matches.subcommand_matches("remove") {
-        let target = remove_matches.value_of("TARGET").unwrap();
-        let name = remove_matches.value_of("NAME").unwrap();
-
-        mutated = db.remove_alternative(name, target);
-
-        if mutated {
-            println!("update-alternatives: removed alternative {} for {}",
-                     target, name);
-        }
-    } else {
-        mutated = false;
-    }
-
-    if mutated {
-        if let Err(e) = db.write_out("/etc/alternatives") {
-            eprintln!("update-alternatives: could not commit changes to \
-                      /etc/alternatives: {}", e);
-
-            std::process::exit(1);
-        } else if let Err(e) = db.write_links() {
-            eprintln!("update-alternatives: could not write symlinks: {}", e);
-
-            std::process::exit(1);
-        }
-    }
 }
 
 static ABOUT: &'static str =
